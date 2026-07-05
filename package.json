@@ -1,0 +1,26 @@
+{
+  "name": "redis-rate-limiter",
+  "version": "1.0.0",
+  "description": "A lightweight Redis-based rate limiter for Node.js supporting Fixed Window and Sliding Window algorithms.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "keywords": [
+    "redis",
+    "rate-limiter",
+    "nodejs",
+    "backend",
+    "fixed-window",
+    "sliding-window"
+  ],
+  "author": "Bhuvan",
+  "license": "MIT",
+  "dependencies": {
+    "redis": "^6.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
