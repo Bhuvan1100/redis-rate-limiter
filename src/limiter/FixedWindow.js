@@ -1,7 +1,13 @@
-class FixedWindow {
+import BaseLimiter from "./BaseLimiter.js";
+
+class FixedWindow extends BaseLimiter {
 
     constructor({ redis, window, max }) {
-        this.redis = redis;
+        super({ redis });
+
+        this.validatePositiveInteger(window, "window");
+        this.validatePositiveInteger(max, "max");
+
         this.window = window;
         this.max = max;
     }
@@ -15,16 +21,18 @@ class FixedWindow {
         }
 
         if (count <= this.max) {
-            return {
+            return this.createResponse({
                 allowed: true,
+                limit: this.max,
                 remaining: this.max - count
-            };
+            });
         }
 
-        return {
+        return this.createResponse({
             allowed: false,
+            limit: this.max,
             remaining: 0
-        };
+        });
     }
 
 }

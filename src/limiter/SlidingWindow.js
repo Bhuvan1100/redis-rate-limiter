@@ -1,8 +1,14 @@
-class SlidingWindow {
+import BaseLimiter from "./BaseLimiter.js";
+
+class SlidingWindow extends BaseLimiter {
 
     constructor({ redis, window, max }) {
-        this.redis = redis;
-        this.window = window; 
+        super({ redis });
+
+        this.validatePositiveInteger(window, "window");
+        this.validatePositiveInteger(max, "max");
+
+        this.window = window;
         this.max = max;
     }
 
@@ -10,42 +16,37 @@ class SlidingWindow {
 
         const now = Date.now();
 
-        
         await this.redis.zRemRangeByScore(
             key,
             0,
             now - this.window
         );
 
-        
         const count = await this.redis.zCard(key);
 
-        
         if (count >= this.max) {
-
-            return {
+            return this.createResponse({
                 allowed: false,
+                limit: this.max,
                 remaining: 0
-            };
-
+            });
         }
 
-       
         await this.redis.zAdd(key, {
             score: now,
             value: `${now}-${Math.random()}`
         });
 
-        
         await this.redis.expire(
             key,
             Math.ceil(this.window / 1000)
         );
 
-        return {
+        return this.createResponse({
             allowed: true,
+            limit: this.max,
             remaining: this.max - count - 1
-        };
+        });
 
     }
 
