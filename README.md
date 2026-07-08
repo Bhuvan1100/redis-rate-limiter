@@ -1,77 +1,21 @@
 # Redis Traffic Limiter
 
-A lightweight Redis-based rate limiter for Node.js using Redis.
+A lightweight, Redis-powered rate limiting library for Node.js with a simple, consistent API and multiple rate limiting algorithms.
 
-Currently supported algorithms:
+## Features
 
 * ✅ Fixed Window
 * ✅ Sliding Window
 * ✅ Token Bucket
+* ✅ Shared, consistent API across all algorithms
+* ✅ Built-in input validation with descriptive error messages
+* ✅ Express middleware support
 
 ---
 
-## What's New in v1.1.0
+## Current Version
 
-### Added
-
-* ✅ Token Bucket rate limiting algorithm.
-
-### Improved
-
-* Introduced a shared `BaseLimiter` for cleaner architecture.
-* Added constructor validation with clear error messages for invalid configuration.
-* Standardized the response object across all algorithms.
-
-All limiters now return the same response format:
-
-```js
-{
-    allowed: true,
-    limit: 100,
-    remaining: 99,
-    retryAfter: null,
-    resetTime: null
-}
-```
-
-> **Note:** `retryAfter` and `resetTime` are currently `null` and will be fully implemented in future releases.
-
----
-
-## Prerequisites
-
-Before using this package, make sure you have:
-
-* Node.js
-* Redis Server
-
----
-
-## Install Redis
-
-### Ubuntu
-
-```bash
-sudo apt update
-sudo apt install redis-server
-```
-
-Start Redis
-
-```bash
-redis-server
-```
-
-### Windows
-
-Run Redis using Docker:
-
-```bash
-docker run -d \
-  --name redis \
-  -p 6379:6379 \
-  redis
-```
+**v1.2.0**
 
 ---
 
@@ -85,104 +29,70 @@ npm install redis-traffic-limiter redis
 
 ---
 
-## Create a Redis Client
+## Prerequisites
 
-```js
-import { createClient } from "redis";
+Before using this package, make sure you have:
 
-const redis = createClient({
-    url: "redis://localhost:6379"
-});
-
-await redis.connect();
-```
-
-Pass the connected Redis client while creating the limiter.
+* Node.js
+* A running Redis server
 
 ---
 
-## Usage
+## Redis Setup
 
-Example programs are available in the `examples/` directory.
-
-* `examples/fixed.js`
-* `examples/sliding.js`
-* `examples/tokenBucket.js`
-
-Run them using:
+### Ubuntu
 
 ```bash
-node examples/fixed.js
+sudo apt update
+sudo apt install redis-server
 ```
 
-or
+Start Redis:
 
 ```bash
-node examples/sliding.js
+redis-server
 ```
 
-or
+### Windows (Docker)
 
 ```bash
-node examples/tokenBucket.js
+docker run -d \
+  --name redis \
+  -p 6379:6379 \
+  redis
 ```
 
 ---
 
 ## Supported Algorithms
 
-### Fixed Window
+The package currently provides the following rate limiting algorithms:
 
-```js
-import { FixedWindow } from "redis-traffic-limiter";
+* **Fixed Window**
+* **Sliding Window**
+* **Token Bucket**
 
-const limiter = new FixedWindow({
-    redis,
-    window: 60000,
-    max: 100
-});
-```
+Each limiter exposes the same public API, making it easy to switch between algorithms without changing application code.
 
 ---
 
-### Sliding Window
+## Express Middleware
 
-```js
-import { SlidingWindow } from "redis-traffic-limiter";
+The package also provides Express middleware for seamless integration with Express applications.
 
-const limiter = new SlidingWindow({
-    redis,
-    window: 60000,
-    max: 100
-});
-```
+The middleware works with any limiter provided by this package and supports configurable options such as:
 
----
+* Client key generation
+* Custom status code
+* Custom response message
 
-### Token Bucket
-
-```js
-import { TokenBucket } from "redis-traffic-limiter";
-
-const limiter = new TokenBucket({
-    redis,
-    capacity: 100,
-    refillRate: 10,
-    interval: 60
-});
-```
-
-Where:
-
-* `capacity` – Maximum number of tokens the bucket can hold.
-* `refillRate` – Number of tokens added every interval.
-* `interval` – Refill interval in seconds.
+See the Express example in the `examples/` directory for complete usage.
 
 ---
 
-## Response Format
+## Standard Response
 
-Every limiter returns a standardized response object.
+Every limiter returns the same response structure.
 
 ```js
 {
@@ -194,16 +104,50 @@ Every limiter returns a standardized response object.
 }
 ```
 
+> **Note:** `retryAfter` and `resetTime` are currently placeholders and will be implemented in future releases.
+
+---
+
+## Examples
+
+The package includes complete examples demonstrating every supported feature.
+
+```
+examples/
+├── fixed-window.js
+├── sliding-window.js
+├── token-bucket.js
+└── express.js
+```
+
+Run any example using Node.js.
+
+```bash
+node examples/fixed-window.js
+```
+
 ---
 
 ## Notes
 
-* The package expects a **connected node-redis client**.
+* A connected **node-redis** client is required.
 * Redis connections are managed by your application.
 * `window` is specified in **milliseconds**.
-* `interval` for the Token Bucket algorithm is specified in **seconds**.
-* Currently supports the official **node-redis** client only.
-* Support for additional Redis clients (e.g. ioredis), Express middleware, Lua scripts for atomic operations, and additional features are planned for future releases.
+* `interval` (Token Bucket) is specified in **seconds**.
+* Currently supports the official **node-redis** client.
+
+---
+
+## Roadmap
+
+Upcoming improvements include:
+
+* RateLimit and Retry-After headers
+* Additional middleware customization
+* Automated tests
+* Performance improvements
+* Lua script support for atomic Redis operations
+* Support for additional Redis clients
 
 ---
 
