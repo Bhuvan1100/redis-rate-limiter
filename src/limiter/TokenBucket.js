@@ -27,7 +27,7 @@ class TokenBucket extends BaseLimiter {
         let tokens;
         let lastRefill;
 
-        // First request
+        
         if (storedTokens === null || storedLastRefill === null) {
             tokens = this.capacity;
             lastRefill = now;
@@ -36,13 +36,13 @@ class TokenBucket extends BaseLimiter {
             lastRefill = Number(storedLastRefill);
         }
 
-        // Calculate elapsed time
+        
         const elapsed = (now - lastRefill) / 1000;
 
-        // Number of complete intervals passed
+        
         const intervalsPassed = Math.floor(elapsed / this.interval);
 
-        // Refill tokens
+        
         if (intervalsPassed > 0) {
             tokens = Math.min(
                 this.capacity,
@@ -54,13 +54,18 @@ class TokenBucket extends BaseLimiter {
 
         if (tokens <= 0) {
 
+            const retryAfter = Math.ceil(
+                this.interval - (elapsed % this.interval)
+            );
+
             await this.redis.set(tokenKey, tokens);
             await this.redis.set(timeKey, lastRefill);
 
             return this.createResponse({
                 allowed: false,
                 limit: this.capacity,
-                remaining: 0
+                remaining: 0,
+                retryAfter
             });
         }
 

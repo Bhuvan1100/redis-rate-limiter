@@ -28,10 +28,13 @@ class FixedWindow extends BaseLimiter {
             });
         }
 
+        const retryAfter = await this.redis.ttl(key);
+
         return this.createResponse({
             allowed: false,
             limit: this.max,
-            remaining: 0
+            remaining: 0,
+            retryAfter
         });
     }
 

@@ -1,27 +1,37 @@
 # Redis Traffic Limiter
 
-A lightweight, Redis-powered rate limiting library for Node.js with a simple, consistent API and multiple rate limiting algorithms.
+A lightweight, Redis-powered rate limiting library for Node.js that provides multiple rate limiting algorithms with a consistent API.
 
-## Features
-
-* ✅ Fixed Window
-* ✅ Sliding Window
-* ✅ Token Bucket
-* ✅ Shared, consistent API across all algorithms
-* ✅ Built-in input validation with descriptive error messages
-* ✅ Express middleware support
+The package is designed to be simple to integrate, easy to switch between algorithms, and flexible enough for production applications.
 
 ---
 
-## Current Version
+# Features
 
-**v1.2.0**
+* ✅ Fixed Window Rate Limiter
+* ✅ Sliding Window Rate Limiter
+* ✅ Token Bucket Rate Limiter
+* ✅ Shared API across all algorithms
+* ✅ Standardized response object
+* ✅ Built-in validation with descriptive error messages
+* ✅ Express middleware
+* ✅ Automatic RateLimit headers
+* ✅ Retry-After header support
+* ✅ Custom response handler
+* ✅ Skip specific Express routes
+* ✅ Official node-redis support
 
 ---
 
-## Installation
+# Current Version
 
-Install the package along with the official Redis client.
+**v1.3.0**
+
+---
+
+# Installation
+
+Install the package together with the official Redis client.
 
 ```bash
 npm install redis-traffic-limiter redis
@@ -29,31 +39,35 @@ npm install redis-traffic-limiter redis
 
 ---
 
-## Prerequisites
+# Requirements
 
-Before using this package, make sure you have:
+Before using this package you should have:
 
 * Node.js
 * A running Redis server
 
 ---
 
-## Redis Setup
+# Redis Setup
 
-### Ubuntu
+## Ubuntu
+
+Install Redis
 
 ```bash
 sudo apt update
 sudo apt install redis-server
 ```
 
-Start Redis:
+Start Redis
 
 ```bash
 redis-server
 ```
 
-### Windows (Docker)
+---
+
+## Windows (Docker)
 
 ```bash
 docker run -d \
@@ -62,39 +76,93 @@ docker run -d \
   redis
 ```
 
+Verify Redis is running
+
+```bash
+redis-cli ping
+```
+
+Expected output
+
+```text
+PONG
+```
+
 ---
 
-## Supported Algorithms
+# Supported Algorithms
 
-The package currently provides the following rate limiting algorithms:
+The package currently provides three rate limiting algorithms.
 
-* **Fixed Window**
-* **Sliding Window**
-* **Token Bucket**
+## Fixed Window
 
-Each limiter exposes the same public API, making it easy to switch between algorithms without changing application code.
+Counts requests inside a fixed time window.
+
+Best suited for:
+
+* Simple APIs
+* Internal services
+* Lightweight applications
 
 ---
 
-## Express Middleware
+## Sliding Window
 
-The package also provides Express middleware for seamless integration with Express applications.
+Tracks individual requests inside a moving time window.
 
-The middleware works with any limiter provided by this package and supports configurable options such as:
+Best suited for:
 
-* Client key generation
-* Custom status code
+* Public APIs
+* More accurate rate limiting
+* Smoother traffic control
+
+---
+
+## Token Bucket
+
+Uses tokens that refill over time.
+
+Best suited for:
+
+* Burst traffic
+* Login APIs
+* Public-facing endpoints
+
+---
+
+Every limiter exposes the same public API, allowing you to switch algorithms without changing your application code.
+
+---
+
+# Express Middleware
+
+The package includes built-in Express middleware that works with every limiter.
+
+Supported middleware options include:
+
+* Custom client key generation
+* Custom HTTP status code
 * Custom response message
+* Custom blocked response handler
+* Skip selected routes
+* Automatic RateLimit headers
+* Automatic Retry-After header
 
-See the Express example in the `examples/` directory for complete usage.
+See:
+
+```
+examples/express.js
+```
+
+for a complete example.
 
 ---
 
-## Standard Response
+# Standard Response
 
-Every limiter returns the same response structure.
+Every limiter returns the same response object.
 
-```js
+```javascript
 {
     allowed: true,
     limit: 100,
@@ -104,13 +172,38 @@ Every limiter returns the same response structure.
 }
 ```
 
-> **Note:** `retryAfter` and `resetTime` are currently placeholders and will be implemented in future releases.
+## Fields
+
+| Field      | Description                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| allowed    | Whether the current request is allowed                               |
+| limit      | Maximum requests/tokens allowed                                      |
+| remaining  | Remaining requests/tokens available                                  |
+| retryAfter | Seconds until another request can be made (null when not applicable) |
+| resetTime  | Reserved for future versions                                         |
 
 ---
 
-## Examples
+# RateLimit Headers
 
-The package includes complete examples demonstrating every supported feature.
+The Express middleware automatically sets the appropriate HTTP headers.
+
+When available:
+
+```
+RateLimit-Limit
+RateLimit-Remaining
+RateLimit-Reset
+Retry-After
+```
+
+Headers are added automatically—no configuration is required.
+
+---
+
+# Examples
+
+Complete working examples are included.
 
 ```
 examples/
@@ -120,7 +213,7 @@ examples/
 └── express.js
 ```
 
-Run any example using Node.js.
+Run an example
 
 ```bash
 node examples/fixed-window.js
@@ -128,29 +221,87 @@ node examples/fixed-window.js
 
 ---
 
-## Notes
+# Package Structure
+
+```
+src/
+├── limiter/
+│   ├── BaseLimiter.js
+│   ├── FixedWindow.js
+│   ├── SlidingWindow.js
+│   └── TokenBucket.js
+│
+├── middleware/
+│   └── express.js
+│
+└── index.js
+```
+
+---
+
+# Notes
 
 * A connected **node-redis** client is required.
 * Redis connections are managed by your application.
-* `window` is specified in **milliseconds**.
-* `interval` (Token Bucket) is specified in **seconds**.
+* Fixed Window `window` is specified in **seconds**.
+* Sliding Window `window` is specified in **milliseconds**.
+* Token Bucket `interval` is specified in **seconds**.
 * Currently supports the official **node-redis** client.
 
 ---
 
-## Roadmap
+# Error Handling
 
-Upcoming improvements include:
+The package validates configuration during construction and throws descriptive errors for invalid input.
 
-* RateLimit and Retry-After headers
-* Additional middleware customization
-* Automated tests
-* Performance improvements
-* Lua script support for atomic Redis operations
-* Support for additional Redis clients
+Examples include:
+
+* Invalid Redis client
+* Missing Redis client
+* Invalid window size
+* Invalid capacity
+* Invalid refill rate
+* Invalid interval
+* Invalid middleware configuration
 
 ---
 
-## License
+# Design Goals
+
+This package focuses on:
+
+* Consistent APIs
+* Minimal configuration
+* Clear architecture
+* Predictable behavior
+* Easy algorithm switching
+* Express-first developer experience
+
+---
+
+# Roadmap
+
+Planned improvements include:
+
+* Reset time support
+* Skip successful requests
+* Skip failed requests
+* Additional middleware customization
+* Automated tests
+* Lua scripts for atomic Redis operations
+* Support for additional Redis clients
+* Additional rate limiting algorithms
+
+---
+
+# Contributing
+
+Issues, feature requests, and pull requests are welcome.
+
+If you discover a bug or have an idea for improving the package, feel free to open an issue.
+
+---
+
+# License
 
 MIT

@@ -29,66 +29,130 @@ await redis.connect();
 
 const limiter = new FixedWindow({
     redis,
-    window: 60, // Time window in seconds
-    max: 5, // Maximum requests allowed
+    window: 60, // Time window (seconds)
+    max: 5,     // Maximum requests allowed
 });
 
 /* -------------------------------------------------------
    Create Express Middleware
 
-   Options:
+   Every option below is OPTIONAL.
+
+   If an option is omitted, the package automatically
+   uses its default value.
+
+   Available Options
+   -----------------
 
    keyGenerator
-   ------------
-   Function used to generate the unique identifier for
-   rate limiting.
+       Generates the unique identifier used for
+       rate limiting.
 
-   Default:
-       (req) => req.ip
+       Default:
+           (req) => req.ip
 
-   Examples:
-
-       (req) => req.ip
-
-       (req) => req.user.id
-
-       (req) => req.headers["x-api-key"]
+       Examples:
+           (req) => req.ip
+           (req) => req.user.id
+           (req) => req.headers["x-api-key"]
 
 
    statusCode
-   ----------
-   HTTP status code returned when the request exceeds
-   the configured limit.
+       HTTP status returned when the request
+       exceeds the configured limit.
 
-   Default:
-       429
+       Default:
+           429
 
 
    message
-   -------
-   Message returned in the response body when the client
-   is rate limited.
+       Default message returned when a request
+       is rate limited.
+
+       Default:
+           "Too many requests"
+
+
+   responseHandler
+       Allows complete customization of the
+       response sent when a request is blocked.
+
+       If omitted, the middleware returns:
+
+       {
+           message,
+           ...result
+       }
+
+
+
+
+   skipPaths
+   ---------
+   An array of route paths that should bypass
+   rate limiting completely.
+
+   Requests to these paths will:
+
+   • Skip the limiter
+   • Skip Redis operations
+   • Skip rate limit headers
+   • Call next() immediately
 
    Default:
-       "Too many requests"
+       []
+
+   Example:
+
+       [
+           "/health",
+           "/metrics",
+           "/favicon.ico"
+       ]
+
 ------------------------------------------------------- */
 
 const rateLimiter = createExpressRateLimiter(limiter, {
+
+    // Default: (req) => req.ip
     keyGenerator: (req) => req.ip,
+
+    // Default: 429
     statusCode: 429,
+
+    // Default: "Too many requests"
     message: "Too many requests. Please try again later.",
+
+    // Optional
+    // Remove this option to use the default response.
+    responseHandler(req, res, result) {
+        return res.status(429).json({
+            success: false,
+            error: "RATE_LIMIT_EXCEEDED",
+            retryAfter: result.retryAfter,
+            rateLimit: result,
+        });
+    },
+
+    // path the limiter will not check or rate limit in any way
+    skipPaths: [
+        "/health",
+        "/metrics",
+    ],
+
 });
 
 /* -------------------------------------------------------
    Register Middleware
 
-   app.use() applies the middleware to every route.
+   Apply globally:
 
-   You can also register it for individual routes.
+       app.use(rateLimiter);
 
-   Example:
+   Or protect specific routes:
 
-   app.get("/login", rateLimiter, handler);
+       app.get("/login", rateLimiter, handler);
+
 ------------------------------------------------------- */
 
 app.use(rateLimiter);
@@ -97,12 +161,23 @@ app.use(rateLimiter);
    Example Route
 ------------------------------------------------------- */
 
+app.get("/health", (req, res) => {
+    res.json({
+        success: true,
+        message: "Server is healthy.",
+    });
+});
+
+
+
 app.get("/", (req, res) => {
+
     res.json({
         success: true,
         message: "Request allowed.",
         rateLimit: req.rateLimit,
     });
+
 });
 
 /* -------------------------------------------------------

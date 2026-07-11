@@ -25,10 +25,18 @@ class SlidingWindow extends BaseLimiter {
         const count = await this.redis.zCard(key);
 
         if (count >= this.max) {
+
+            const oldest = await this.redis.zRangeWithScores(key, 0, 0);
+
+            const retryAfter = Math.ceil(
+                (oldest[0].score + this.window - now) / 1000
+            );
+
             return this.createResponse({
                 allowed: false,
                 limit: this.max,
-                remaining: 0
+                remaining: 0,
+                retryAfter
             });
         }
 
@@ -47,7 +55,6 @@ class SlidingWindow extends BaseLimiter {
             limit: this.max,
             remaining: this.max - count - 1
         });
-
     }
 
 }
