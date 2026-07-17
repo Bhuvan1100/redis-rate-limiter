@@ -11,6 +11,8 @@ The package is designed to be simple to integrate, easy to switch between algori
 * ✅ Fixed Window Rate Limiter
 * ✅ Sliding Window Rate Limiter
 * ✅ Token Bucket Rate Limiter
+* ✅ Lua scripts for atomic Redis operations
+* ✅ Automatic Lua script reloading after Redis restart
 * ✅ Shared API across all algorithms
 * ✅ Standardized response object
 * ✅ Built-in validation with descriptive error messages
@@ -174,13 +176,13 @@ Every limiter returns the same response object.
 
 ## Fields
 
-| Field      | Description                                                          |
-| ---------- | -------------------------------------------------------------------- |
-| allowed    | Whether the current request is allowed                               |
-| limit      | Maximum requests/tokens allowed                                      |
-| remaining  | Remaining requests/tokens available                                  |
-| retryAfter | Seconds until another request can be made (null when not applicable) |
-| resetTime  | Reserved for future versions                                         |
+| Field | Description |
+|-------|-------------|
+| allowed | Whether the current request is allowed |
+| limit | Maximum requests/tokens allowed |
+| remaining | Remaining requests/tokens available |
+| retryAfter | Seconds until another request can be made (`null` when not applicable) |
+| resetTime | Reserved for future versions |
 
 ---
 
@@ -231,6 +233,12 @@ src/
 │   ├── SlidingWindow.js
 │   └── TokenBucket.js
 │
+├── lua/
+│   ├── fixedWindow.lua
+│   ├── slidingWindow.lua
+│   ├── tokenBucket.lua
+│   └── loadLuaScript.js
+│
 ├── middleware/
 │   └── express.js
 │
@@ -246,6 +254,8 @@ src/
 * Fixed Window `window` is specified in **seconds**.
 * Sliding Window `window` is specified in **milliseconds**.
 * Token Bucket `interval` is specified in **seconds**.
+* Redis operations are executed atomically using **Lua scripts**.
+* Lua scripts are automatically reloaded if Redis is restarted.
 * Currently supports the official **node-redis** client.
 
 ---
@@ -288,7 +298,6 @@ Planned improvements include:
 * Skip failed requests
 * Additional middleware customization
 * Automated tests
-* Lua scripts for atomic Redis operations
 * Support for additional Redis clients
 * Additional rate limiting algorithms
 
