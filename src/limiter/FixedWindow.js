@@ -1,7 +1,7 @@
 import BaseLimiter from "./BaseLimiter.js";
+import { loadLuaScript } from "../lua/loadLuaScript.js";
 
 class FixedWindow extends BaseLimiter {
-
     constructor({ redis, window, max }) {
         super({ redis });
 
@@ -10,34 +10,80 @@ class FixedWindow extends BaseLimiter {
 
         this.window = window;
         this.max = max;
+
+        this.scriptSha = null;
+    }
+
+    async getScriptSha() {
+        if (!this.scriptSha) {
+            this.scriptSha = await loadLuaScript(
+                this.redis,
+                "fixedWindow.lua"
+            );
+        }
+
+        return this.scriptSha;
     }
 
     async consume(key) {
+        let sha = await this.getScriptSha();
 
-        const count = await this.redis.incr(key);
-
-        if (count === 1) {
-            await this.redis.expire(key, this.window);
-        }
-
-        if (count <= this.max) {
-            return this.createResponse({
-                allowed: true,
-                limit: this.max,
-                remaining: this.max - count
+        try {
+            const [allowed, count, ttl] = await this.redis.evalSha(sha, {
+                keys: [key],
+                arguments: [
+                    this.window.toString(),
+                    this.max.toString()
+                ]
             });
+
+            if (allowed === 1) {
+                return this.createResponse({
+                    allowed: true,
+                    limit: this.max,
+                    remaining: this.max - count
+                });
+            }
+
+            return this.createResponse({
+                allowed: false,
+                limit: this.max,
+                remaining: 0,
+                retryAfter: ttl
+            });
+        } catch (err) {
+            if (err.message.includes("NOSCRIPT")) {
+                this.scriptSha = null;
+
+                sha = await this.getScriptSha();
+
+                const [allowed, count, ttl] = await this.redis.evalSha(sha, {
+                    keys: [key],
+                    arguments: [
+                        this.window.toString(),
+                        this.max.toString()
+                    ]
+                });
+
+                if (allowed === 1) {
+                    return this.createResponse({
+                        allowed: true,
+                        limit: this.max,
+                        remaining: this.max - count
+                    });
+                }
+
+                return this.createResponse({
+                    allowed: false,
+                    limit: this.max,
+                    remaining: 0,
+                    retryAfter: ttl
+                });
+            }
+
+            throw err;
         }
-
-        const retryAfter = await this.redis.ttl(key);
-
-        return this.createResponse({
-            allowed: false,
-            limit: this.max,
-            remaining: 0,
-            retryAfter
-        });
     }
-
 }
 
 export default FixedWindow;

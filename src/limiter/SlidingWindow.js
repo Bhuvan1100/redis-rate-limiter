@@ -1,4 +1,5 @@
 import BaseLimiter from "./BaseLimiter.js";
+import { loadLuaScript } from "../lua/loadLuaScript.js";
 
 class SlidingWindow extends BaseLimiter {
 
@@ -10,27 +11,46 @@ class SlidingWindow extends BaseLimiter {
 
         this.window = window;
         this.max = max;
+
+        this.scriptSha = null;
+    }
+
+    async getScriptSha() {
+        if (!this.scriptSha) {
+            this.scriptSha = await loadLuaScript(
+                this.redis,
+                "slidingWindow.lua"
+            );
+        }
+
+        return this.scriptSha;
     }
 
     async consume(key) {
 
         const now = Date.now();
+        const member = `${now}-${Math.random()}`;
 
-        await this.redis.zRemRangeByScore(
-            key,
-            0,
-            now - this.window
-        );
+        let sha = await this.getScriptSha();
 
-        const count = await this.redis.zCard(key);
+        try {
+            const [allowed, count, retryAfter] = await this.redis.evalSha(sha, {
+                keys: [key],
+                arguments: [
+                    now.toString(),
+                    this.window.toString(),
+                    this.max.toString(),
+                    member
+                ]
+            });
 
-        if (count >= this.max) {
-
-            const oldest = await this.redis.zRangeWithScores(key, 0, 0);
-
-            const retryAfter = Math.ceil(
-                (oldest[0].score + this.window - now) / 1000
-            );
+            if (allowed === 1) {
+                return this.createResponse({
+                    allowed: true,
+                    limit: this.max,
+                    remaining: this.max - count
+                });
+            }
 
             return this.createResponse({
                 allowed: false,
@@ -38,23 +58,41 @@ class SlidingWindow extends BaseLimiter {
                 remaining: 0,
                 retryAfter
             });
+
+        } catch (err) {
+            if (err.message.includes("NOSCRIPT")) {
+                this.scriptSha = null;
+
+                sha = await this.getScriptSha();
+
+                const [allowed, count, retryAfter] = await this.redis.evalSha(sha, {
+                    keys: [key],
+                    arguments: [
+                        now.toString(),
+                        this.window.toString(),
+                        this.max.toString(),
+                        member
+                    ]
+                });
+
+                if (allowed === 1) {
+                    return this.createResponse({
+                        allowed: true,
+                        limit: this.max,
+                        remaining: this.max - count
+                    });
+                }
+
+                return this.createResponse({
+                    allowed: false,
+                    limit: this.max,
+                    remaining: 0,
+                    retryAfter
+                });
+            }
+
+            throw err;
         }
-
-        await this.redis.zAdd(key, {
-            score: now,
-            value: `${now}-${Math.random()}`
-        });
-
-        await this.redis.expire(
-            key,
-            Math.ceil(this.window / 1000)
-        );
-
-        return this.createResponse({
-            allowed: true,
-            limit: this.max,
-            remaining: this.max - count - 1
-        });
     }
 
 }

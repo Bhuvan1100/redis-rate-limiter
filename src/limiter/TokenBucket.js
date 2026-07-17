@@ -1,4 +1,5 @@
 import BaseLimiter from "./BaseLimiter.js";
+import { loadLuaScript } from "../lua/loadLuaScript.js";
 
 class TokenBucket extends BaseLimiter {
 
@@ -12,54 +13,50 @@ class TokenBucket extends BaseLimiter {
         this.capacity = capacity;
         this.refillRate = refillRate;
         this.interval = interval;
+
+        this.scriptSha = null;
+    }
+
+    async getScriptSha() {
+        if (!this.scriptSha) {
+            this.scriptSha = await loadLuaScript(
+                this.redis,
+                "tokenBucket.lua"
+            );
+        }
+
+        return this.scriptSha;
     }
 
     async consume(key) {
 
         const tokenKey = `${key}:tokens`;
         const timeKey = `${key}:lastRefill`;
-
         const now = Date.now();
 
-        const storedTokens = await this.redis.get(tokenKey);
-        const storedLastRefill = await this.redis.get(timeKey);
+        let sha = await this.getScriptSha();
 
-        let tokens;
-        let lastRefill;
-
-        
-        if (storedTokens === null || storedLastRefill === null) {
-            tokens = this.capacity;
-            lastRefill = now;
-        } else {
-            tokens = Number(storedTokens);
-            lastRefill = Number(storedLastRefill);
-        }
-
-        
-        const elapsed = (now - lastRefill) / 1000;
-
-        
-        const intervalsPassed = Math.floor(elapsed / this.interval);
-
-        
-        if (intervalsPassed > 0) {
-            tokens = Math.min(
-                this.capacity,
-                tokens + intervalsPassed * this.refillRate
+        try {
+            const [allowed, remaining, retryAfter] = await this.redis.evalSha(
+                sha,
+                {
+                    keys: [tokenKey, timeKey],
+                    arguments: [
+                        this.capacity.toString(),
+                        this.refillRate.toString(),
+                        this.interval.toString(),
+                        now.toString()
+                    ]
+                }
             );
 
-            lastRefill += intervalsPassed * this.interval * 1000;
-        }
-
-        if (tokens <= 0) {
-
-            const retryAfter = Math.ceil(
-                this.interval - (elapsed % this.interval)
-            );
-
-            await this.redis.set(tokenKey, tokens);
-            await this.redis.set(timeKey, lastRefill);
+            if (allowed === 1) {
+                return this.createResponse({
+                    allowed: true,
+                    limit: this.capacity,
+                    remaining
+                });
+            }
 
             return this.createResponse({
                 allowed: false,
@@ -67,18 +64,44 @@ class TokenBucket extends BaseLimiter {
                 remaining: 0,
                 retryAfter
             });
+
+        } catch (err) {
+            if (err.message.includes("NOSCRIPT")) {
+                this.scriptSha = null;
+
+                sha = await this.getScriptSha();
+
+                const [allowed, remaining, retryAfter] = await this.redis.evalSha(
+                    sha,
+                    {
+                        keys: [tokenKey, timeKey],
+                        arguments: [
+                            this.capacity.toString(),
+                            this.refillRate.toString(),
+                            this.interval.toString(),
+                            now.toString()
+                        ]
+                    }
+                );
+
+                if (allowed === 1) {
+                    return this.createResponse({
+                        allowed: true,
+                        limit: this.capacity,
+                        remaining
+                    });
+                }
+
+                return this.createResponse({
+                    allowed: false,
+                    limit: this.capacity,
+                    remaining: 0,
+                    retryAfter
+                });
+            }
+
+            throw err;
         }
-
-        tokens--;
-
-        await this.redis.set(tokenKey, tokens);
-        await this.redis.set(timeKey, lastRefill);
-
-        return this.createResponse({
-            allowed: true,
-            limit: this.capacity,
-            remaining: tokens
-        });
     }
 }
 

@@ -28,7 +28,7 @@ await redis.connect();
 
    window
    ------
-   Time window (in milliseconds).
+   Time window (in seconds).
 
    max
    ---
@@ -37,8 +37,8 @@ await redis.connect();
 
 const limiter = new FixedWindow({
     redis,
-    window: 60_000, // 60 seconds
-    max: 5,          // Allow 5 requests per window
+    window: 60, // 60 seconds
+    max: 5,      // Allow 5 requests per window
 });
 
 /* -------------------------------------------------------

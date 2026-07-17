@@ -83,7 +83,7 @@ Example Output
     allowed: true,
     limit: 5,
     remaining: 4,
-    retryAfter: null,
+    retryAfter: 27,
     resetTime: null
 }
 */
